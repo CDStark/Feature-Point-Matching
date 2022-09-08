@@ -40,12 +40,11 @@ imageA = None
 matchesA = []
 matchesB = []
 
-imageBLoaded = False
-imageALoaded = False
+imagesLoaded = False
 
 def selectGlobalCanvas(event):
     
-    if imageBLoaded == False or imageALoaded == False:
+    if not imagesLoaded:
         return
     
     global x1,y1,x2,y2, ix1, iy1, ix2, iy2, matchesA, matchesB
@@ -86,7 +85,7 @@ def selectGlobalCanvas(event):
 
         
 def loadImages(image_root_path, image_id):
-    global canvasG, img_w, img_h, imageB, imageA, imageBLoaded, imageALoaded
+    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded
 
     root = Path(image_root_path)
     path1 = root / (image_id.get() + '_001.tiff')
@@ -98,13 +97,10 @@ def loadImages(image_root_path, image_id):
     imageA = cv_img
 
     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
+    photoA = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
     # Add a PhotoImage to the Canvas
-    canvasG.create_image(0, 0, image=photo, anchor=tk.NW, tags="imageA")
+    canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
 
-    if imageALoaded == True:
-        clearSelection()
-    imageALoaded = True
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path2)), cv2.COLOR_BGR2RGB)
@@ -112,40 +108,16 @@ def loadImages(image_root_path, image_id):
     imageB = cv_img
 
     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
+    photoB = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
     # Add a PhotoImage to the Canvas
-    canvasG.create_image(img_w+10, 0, image=photo, anchor=tk.NW, tags="imageB")
+    canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageB")
 
-    if imageBLoaded == True:
+    if imagesLoaded == True:
         clearSelection()
-    imageBLoaded = True
+    imagesLoaded = True
 
     tk.mainloop()
 
-# def loadImage2(image_path):
-#     global canvasG, img_w, img_h, imageA, imageB, imageALoaded, imageBLoaded
-#
-#     #print(image_path.get())
-#     # Load an image using OpenCV
-#     cv_img = cv2.cvtColor(cv2.imread(image_path.get()), cv2.COLOR_BGR2RGB)
-#     # cv_img = cv2.cvtColor(cv2.imread("input_1_2.jpg"), cv2.COLOR_BGR2RGB)
-#     # cv_img = cv2.imread(image_path.get())
-#
-#     cv_img = cv2.resize(cv_img, (img_w, img_h))
-#     imageA= cv_img
-#
-#     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-#     photo = ImageTk.PhotoImage(image = Image.fromarray(cv_img))
-#
-#     # Add a PhotoImage to the Canvas
-#     canvasG.create_image(img_w+10, 0, image=photo, anchor=tk.NW, tags="imageB")
-#
-#     if imageALoaded == True:
-#         clearSelection()
-#
-#     imageALoaded = True
-#
-#     tk.mainloop()
 
 def clearSelection():
     global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB
@@ -157,10 +129,10 @@ def clearSelection():
     
     inA = inB = False
     
-    photoA = ImageTk.PhotoImage(image = Image.fromarray(imageA))
+    photoA = ImageTk.PhotoImage(image=Image.fromarray(imageA))
     canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
     
-    photoB = ImageTk.PhotoImage(image = Image.fromarray(imageB))
+    photoB = ImageTk.PhotoImage(image=Image.fromarray(imageB))
     canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageB")
     
     tk.mainloop()
@@ -177,7 +149,7 @@ def errorPopup(msg):
 def matchKeyPoints():
     global matchesA, matchesB, imageB, imageA
     
-    if imageBLoaded == False or imageALoaded == False:
+    if not imagesLoaded:
         errorPopup("First select two images!")
         return
     
