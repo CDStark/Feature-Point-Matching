@@ -65,9 +65,9 @@ def selectGlobalCanvas(event):
         iy1 = y
         inA = True
         
-        canvasG.create_oval(event.x-5, event.y-5, event.x+5, event.y+5, outline="blue",
-                         width=2)
-        
+        canvasG.create_line(event.x-5, event.y, event.x+5, event.y, fill="blue", width=1)
+        canvasG.create_line(event.x, event.y-5, event.x, event.y+5, fill="blue", width=1)
+
     elif x > img_w+10:
         x2 = x
         y2 = y
@@ -75,13 +75,13 @@ def selectGlobalCanvas(event):
         ix2 = x-img_w-10
         iy2 = y
         inB = True
-        canvasG.create_oval(event.x-5, event.y-5, event.x+5, event.y+5, outline="yellow",
-                         width=2)
-    
-    
-    
+        canvasG.create_line(event.x+5, event.y, event.x-5, event.y, fill="yellow", width=1)
+        canvasG.create_line(event.x, event.y+5, event.x, event.y-5, fill="yellow", width=1)
+
+
+
     if inA == True and inB == True:
-        canvasG.create_line(x1, y1, x2, y2, fill="red", width=3)
+        canvasG.create_line(x1, y1, x2, y2, fill="red", width=1)
         matchesA.append([ix1,iy1])
         matchesB.append([ix2,iy2])
         inA = False
@@ -93,7 +93,7 @@ def loadImages(imgs_root_path, imgs_id):
     global canvasG, img_w, img_h, imageB, imageA, imagesLoaded, images_root, images_id
 
     images_root = Path(imgs_root_path.get())
-    images_id = images_id.get()
+    images_id = imgs_id.get()
     path1 = images_root / (images_id + '_001.tiff')
     path2 = images_root / (images_id + '_070.tiff')
 
