@@ -34,18 +34,18 @@ iy2 = 0
 inA = False
 inB = False
 
-imageA = None
 imageB = None
+imageA = None
 
 matchesA = []
 matchesB = []
 
-imageALoaded = False
 imageBLoaded = False
+imageALoaded = False
 
 def selectGlobalCanvas(event):
     
-    if imageALoaded == False or imageBLoaded == False:
+    if imageBLoaded == False or imageALoaded == False:
         return
     
     global x1,y1,x2,y2, ix1, iy1, ix2, iy2, matchesA, matchesB
@@ -86,7 +86,7 @@ def selectGlobalCanvas(event):
 
         
 def loadImages(image_root_path, image_id):
-    global canvasG, img_w, img_h, imageA, imageB, imageALoaded, imageBLoaded
+    global canvasG, img_w, img_h, imageB, imageA, imageBLoaded, imageALoaded
 
     root = Path(image_root_path)
     path1 = root / (image_id.get() + '_001.tiff')
@@ -95,30 +95,30 @@ def loadImages(image_root_path, image_id):
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
     cv_img = cv2.resize(cv_img, (img_w, img_h))
-    imageB = cv_img
-
-    # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photo = ImageTk.PhotoImage(image = Image.fromarray(cv_img))
-    # Add a PhotoImage to the Canvas
-    canvasG.create_image(0, 0, image=photo, anchor=tk.NW, tags="imageA")
-
-    if imageBLoaded == True:
-        clearSelection()
-    imageBLoaded = True
-
-    # Load an image using OpenCV
-    cv_img = cv2.cvtColor(cv2.imread(str(path2)), cv2.COLOR_BGR2RGB)
-    cv_img = cv2.resize(cv_img, (img_w, img_h))
     imageA = cv_img
 
     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photo = ImageTk.PhotoImage(image = Image.fromarray(cv_img))
+    photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
     # Add a PhotoImage to the Canvas
-    canvasG.create_image(img_w+10, 0, image=photo, anchor=tk.NW, tags="imageB")
+    canvasG.create_image(0, 0, image=photo, anchor=tk.NW, tags="imageA")
 
     if imageALoaded == True:
         clearSelection()
     imageALoaded = True
+
+    # Load an image using OpenCV
+    cv_img = cv2.cvtColor(cv2.imread(str(path2)), cv2.COLOR_BGR2RGB)
+    cv_img = cv2.resize(cv_img, (img_w, img_h))
+    imageB = cv_img
+
+    # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
+    photo = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
+    # Add a PhotoImage to the Canvas
+    canvasG.create_image(img_w+10, 0, image=photo, anchor=tk.NW, tags="imageB")
+
+    if imageBLoaded == True:
+        clearSelection()
+    imageBLoaded = True
 
     tk.mainloop()
 
@@ -148,7 +148,7 @@ def loadImages(image_root_path, image_id):
 #     tk.mainloop()
 
 def clearSelection():
-    global canvasG, img_w, img_h, imageA, imageB, matchesA, matchesB
+    global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB
     global inA,inB
     
     canvasG.delete("all")
@@ -157,11 +157,11 @@ def clearSelection():
     
     inA = inB = False
     
-    photoA = ImageTk.PhotoImage(image = Image.fromarray(imageB))
-    canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageB")
+    photoA = ImageTk.PhotoImage(image = Image.fromarray(imageA))
+    canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
     
-    photoB = ImageTk.PhotoImage(image = Image.fromarray(imageA))
-    canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageA")
+    photoB = ImageTk.PhotoImage(image = Image.fromarray(imageB))
+    canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageB")
     
     tk.mainloop()
 
@@ -175,9 +175,9 @@ def errorPopup(msg):
     popup.mainloop()
     
 def matchKeyPoints():
-    global matchesA, matchesB, imageA, imageB
+    global matchesA, matchesB, imageB, imageA
     
-    if imageALoaded == False or imageBLoaded == False:
+    if imageBLoaded == False or imageALoaded == False:
         errorPopup("First select two images!")
         return
     
@@ -219,7 +219,7 @@ image_id = tk.StringVar()
 e2 = tk.Entry(window, textvariable=image_id, width=50)
 e2.grid(row=0, column=1)
 
-tk.Label(window, text='_001.tiff bzw. _070.tiff').grid(row=2)
+tk.Label(window, text='_001.tiff bzw. _070.tiff').grid(row=0, column=2)
 
 loadImages = partial(loadImages, data_root_path, image_id)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
