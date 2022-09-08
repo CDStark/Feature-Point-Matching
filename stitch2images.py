@@ -12,8 +12,10 @@ import numpy as np
 from PIL import ImageTk, Image
 from functools import partial
 from pathlib import Path
+import json
 
 #%%
+# Todo: Don't use global variables but encapsulate in objects
 canvasG = None
 window_width = None
 window_height = None
@@ -42,6 +44,9 @@ matchesB = []
 
 imagesLoaded = False
 
+images_root = None
+images_id = None
+
 def selectGlobalCanvas(event):
     
     if not imagesLoaded:
@@ -53,23 +58,23 @@ def selectGlobalCanvas(event):
     y = event.y
     
     if x < img_w:
-        x2 = x
-        y2 = y
+        x1 = x
+        y1 = y
         
-        ix2 = x
-        iy2 = y
-        inB = True
+        ix1 = x
+        iy1 = y
+        inA = True
         
         canvasG.create_oval(event.x-5, event.y-5, event.x+5, event.y+5, outline="blue",
                          width=2)
         
     elif x > img_w+10:
-        x1 = x
-        y1 = y
+        x2 = x
+        y2 = y
         
-        ix1 = x-img_w-10
-        iy1 = y
-        inA = True
+        ix2 = x-img_w-10
+        iy2 = y
+        inB = True
         canvasG.create_oval(event.x-5, event.y-5, event.x+5, event.y+5, outline="yellow",
                          width=2)
     
@@ -84,12 +89,13 @@ def selectGlobalCanvas(event):
         
 
         
-def loadImages(image_root_path, image_id):
-    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded
+def loadImages(imgs_root_path, imgs_id):
+    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded, images_root, images_id
 
-    root = Path(image_root_path)
-    path1 = root / (image_id.get() + '_001.tiff')
-    path2 = root / (image_id.get() + '_070.tiff')
+    images_root = Path(imgs_root_path.get())
+    images_id = images_id.get()
+    path1 = images_root / (images_id + '_001.tiff')
+    path2 = images_root / (images_id + '_070.tiff')
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
@@ -120,7 +126,7 @@ def loadImages(image_root_path, image_id):
 
 
 def clearSelection():
-    global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB
+    global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB, images_root, images_id
     global inA,inB
     
     canvasG.delete("all")
@@ -157,9 +163,17 @@ def matchKeyPoints():
         errorPopup("Not Sufficient Points selected\n Select atleast 4 correspondances!")
         return
     
-    ptsA = np.float32(matchesA)
-    ptsB = np.float32(matchesB)
-    np.savetxt('matchesA.csv', delimiter=',')
+    save_data = {'pointsA': matchesA,
+                 'pointsB': matchesB,
+                 'imagesID': images_id,
+                 'imageDimensions (w,h)': (img_w, img_h)
+                 }
+    path = images_root / (images_id + '_match_data.json')
+    if path.exists():
+        errorPopup('! Warning - file already exists - won\'t be saved!')
+        return
+    with open(path, 'w') as file:
+        json.dump(save_data, file)
 
 # ------------------------------------------------------------------------------
 # Main
@@ -179,30 +193,25 @@ img_h = window_height - 300
 window.geometry("%dx%d" % (window_width, window_height)) 
 window.title("Image Stitching - Kartik Saini") 
 
-# image path input
-data_root_path = Path.cwd() / 'Data'
-tk.Label(window, text='Path: '+str(data_root_path)).grid(row=0)
-# image_root = tk.StringVar()
-# e1 = tk.Entry(window, textvariable=image_root, width=50)
-# e1.grid(row=0, column=1)
+# load images bar
+tk.Label(window, text='Root dir: ').grid(row=0)
 
-# tk.Label(window, text='Image File base').grid(row=0, column=1)
-image_id = tk.StringVar()
-e2 = tk.Entry(window, textvariable=image_id, width=50)
-e2.grid(row=0, column=1)
+images_root = tk.StringVar()
+images_root.set('/home/cstaerk/Documents/Uni/Studienarbeit/Feature-Point-Matching/Data/')
+e1 = tk.Entry(window, textvariable=images_root, width=50)
+e1.grid(row=0, column=1)
 
-tk.Label(window, text='_001.tiff bzw. _070.tiff').grid(row=0, column=2)
+tk.Label(window, text='Image ID: ').grid(row=0, column=2)
 
-loadImages = partial(loadImages, data_root_path, image_id)
+images_id = tk.StringVar()
+e2 = tk.Entry(window, textvariable=images_id, width=50)
+e2.grid(row=0, column=3)
+
+tk.Label(window, text='_001.tiff bzw. _070.tiff').grid(row=0, column=4)
+
+loadImages = partial(loadImages, images_root, images_id)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
-b1.grid(row=0, column=3)
-
-# window.grid_columnconfigure(3, minsize=200)
-
-
-# loadImage2 = partial(loadImage2, img2)
-# b2 = tk.Button(window, text='Load', width=10, command=loadImage2)
-# b2.grid(row=0, column=6)
+b1.grid(row=0, column=5)
 
 
 canvasG = tk.Canvas(window, width=2*img_w+10, height=img_h, bg="grey") 
