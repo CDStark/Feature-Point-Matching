@@ -1,5 +1,21 @@
-# Image-Processing
+Libraries used-
 
-`OpenCV` `Python`
+- opencv-python
+- tkinter
+- Pillow
 
-This repository contains some fundamental image processing operations in OpenCV and an application to stitch multiple images by selecting matching points manually.
+run cmd - 
+
+```
+$ python3 match_keypoints.py
+```
+
+Using the tool-
+-	Enter root dir path and the image-ID of the image pair
+-	After opening the images, select one point from one image and second from other adjacent image to select corresponding matching points.
+-	At least 4 correspondance points must be selected
+-	Selected points can be undone
+-	Selecting multiple points in same image simulataneously will consider last point selected for matching
+-	Save data with corresponding button before loading the next image pair
+
+Results-

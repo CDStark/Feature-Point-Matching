@@ -22,6 +22,8 @@ window_height = None
 drawLine = False
 img_w = None
 img_h = None
+original_image_dimA = None
+original_image_dimB = None
 
 x1 = 0
 y1 = 0
@@ -86,19 +88,21 @@ def selectGlobalCanvas(event):
         matchesB.append([ix2,iy2])
         inA = False
         inB = False
-        
+
 
         
 def loadImages(imgs_root_path, imgs_id):
-    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded, images_root, images_id
+    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded, images_root,\
+        images_id, original_image_dimA, original_image_dimB
 
     images_root = Path(imgs_root_path.get())
     images_id = imgs_id.get()
-    path1 = images_root / (images_id + '_001.tiff')
-    path2 = images_root / (images_id + '_070.tiff')
+    path1 = images_root / (images_id + 'A.tiff')
+    path2 = images_root / (images_id + 'B.tiff')
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
+    original_image_dimA = cv_img.shape
     cv_img = cv2.resize(cv_img, (img_w, img_h))
     imageA = cv_img
 
@@ -110,6 +114,7 @@ def loadImages(imgs_root_path, imgs_id):
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path2)), cv2.COLOR_BGR2RGB)
+    original_image_dimB = cv_img.shape
     cv_img = cv2.resize(cv_img, (img_w, img_h))
     imageB = cv_img
 
@@ -152,8 +157,8 @@ def errorPopup(msg):
     B1.pack()
     popup.mainloop()
     
-def matchKeyPoints():
-    global matchesA, matchesB, imageB, imageA
+def exportMatchData():
+    # global matchesA, matchesB, imageB, imageA
     
     if not imagesLoaded:
         errorPopup("First select two images!")
@@ -162,11 +167,19 @@ def matchKeyPoints():
     if len(matchesA) < 4:
         errorPopup("Not Sufficient Points selected\n Select atleast 4 correspondances!")
         return
-    
-    save_data = {'pointsA': matchesA,
-                 'pointsB': matchesB,
+
+    # undo resize to achive positions on original images
+    kxa = original_image_dimA[0]/img_w
+    kya = original_image_dimA[1]/img_h
+    kxb = original_image_dimB[0]/img_w
+    kyb = original_image_dimB[1]/img_h
+    matchesA_resized = [[x*kxa, y*kya] for x, y in matchesA]
+    matchesB_resized = [[x*kxb, y*kyb] for x, y in matchesB]
+
+    # pack data and save to json file
+    save_data = {'pointsA': matchesA_resized,
+                 'pointsB': matchesB_resized,
                  'imagesID': images_id,
-                 'imageDimensions (w,h)': (img_w, img_h)
                  }
     path = images_root / (images_id + '_match_data.json')
     if path.exists():
@@ -207,7 +220,7 @@ images_id = tk.StringVar()
 e2 = tk.Entry(window, textvariable=images_id, width=50)
 e2.grid(row=0, column=3)
 
-tk.Label(window, text='_001.tiff bzw. _070.tiff').grid(row=0, column=4)
+tk.Label(window, text='A.tiff bzw. B.tiff').grid(row=0, column=4)
 
 loadImages = partial(loadImages, images_root, images_id)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
@@ -221,7 +234,7 @@ canvasG.bind("<Button 1>",selectGlobalCanvas)
 b3 = tk.Button(window, text='Undo Selection', width=30, command=clearSelection)
 b3.place(x=300, y=img_h+100)
 
-b4 = tk.Button(window, text='Save feature points', width=30, command=matchKeyPoints)
+b4 = tk.Button(window, text='Save feature points', width=30, command=exportMatchData)
 b4.place(x=window_width - 500, y=img_h+100)
 
 
