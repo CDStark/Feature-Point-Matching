@@ -27,6 +27,7 @@ original_image_dimB = None
 
 imageB = None
 imageA = None
+depth_imageA = None
 depth_mapA = None
 depth_mapB = None
 
@@ -133,7 +134,7 @@ def selectGlobalCanvas(event):
 
 
 def loadImages(imgs_root_path, imgs_idA, imgs_idB):
-    global canvasG, img_w, img_h, imageB, imageA, depth_mapA, depth_mapB, imagesLoaded, images_root,\
+    global canvasG, img_w, img_h, imageB, imageA,depth_imageA , depth_mapA, depth_mapB, imagesLoaded, images_root,\
         image_idA, image_idB, original_image_dimA, original_image_dimB
 
     images_root = Path(imgs_root_path.get())
@@ -154,8 +155,11 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
 
     # Load depth map from csv using numpy
     depth_mapA = np.genfromtxt(path2)
+    depth_mapA = cv2.resize(depth_mapA, (img_w, img_h))
     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photo2 = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
+    min_val, max_val = depth_mapA.min(), depth_mapA.max()
+    depth_imageA = (depth_mapA - min_val)/(max_val-min_val)*128
+    photo2 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageA))
 
     # Load an image B using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path3)), cv2.COLOR_BGR2RGB)
@@ -182,17 +186,16 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
 
 def clearSelection():
     global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB, images_root, images_id, bbox1, bbox2
-    global inA, inB
-    
+
     canvasG.delete("all")
     bbox1 = {'p1': None, 'p2': None, 'box': None}
     bbox2 = {'p1': None, 'p2': None, 'box': None}
 
-    photoA = ImageTk.PhotoImage(image=Image.fromarray(imageA))
-    canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
+    photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA))
+    canvasG.create_image(0, 0, image=photo1, anchor=tk.NW, tags="imageA")
     
-    photoB = ImageTk.PhotoImage(image=Image.fromarray(imageB))
-    canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageB")
+    photo2 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageA))
+    canvasG.create_image(img_w+10, 0, image=photo2, anchor=tk.NW, tags="imageB")
     
     tk.mainloop()
 
@@ -275,7 +278,7 @@ tk.Label(window, text='.tiff bzw. _depth.csv').grid(row=0, column=5)
 
 loadImages = partial(loadImages, images_root, image_idA, image_idB)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
-b1.grid(row=0, column=5)
+b1.grid(row=0, column=6)
 
 
 canvasG = tk.Canvas(window, width=2*img_w+10, height=img_h, bg="grey") 
