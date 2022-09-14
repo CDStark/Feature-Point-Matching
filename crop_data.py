@@ -31,8 +31,8 @@ depth_imageA = None
 depth_mapA = None
 depth_mapB = None
 
-bbox1 = {'p1': None, 'p2': None, 'box': None}
-bbox2 = {'p1': None, 'p2': None, 'box': None}
+bbox1 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
+bbox2 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
 
 imagesLoaded = False
 
@@ -40,77 +40,49 @@ images_root = None
 image_idA = None
 image_idB = None
 
-# def selectGlobalCanvas(event):
-#
-#     if not imagesLoaded:
-#         return
-#
-#     global x1,y1,x2,y2, ix1, iy1, ix2, iy2, matchesA, matchesB
-#     global canvasG, drawLine, img_w, img_h, inA, inB
-#     x = event.x
-#     y = event.y
-#
-#     if x < img_w:
-#         x1 = x
-#         y1 = y
-#
-#         ix1 = x
-#         iy1 = y
-#         inA = True
-#
-#         canvasG.create_line(event.x-5, event.y, event.x+5, event.y, fill="blue", width=1)
-#         canvasG.create_line(event.x, event.y-5, event.x, event.y+5, fill="blue", width=1)
-#
-#     elif x > img_w+10:
-#         x2 = x
-#         y2 = y
-#
-#         ix2 = x-img_w-10
-#         iy2 = y
-#         inB = True
-#         canvasG.create_line(event.x+5, event.y, event.x-5, event.y, fill="yellow", width=1)
-#         canvasG.create_line(event.x, event.y+5, event.x, event.y-5, fill="yellow", width=1)
-#
-#
-#
-#     if inA == True and inB == True:
-#         canvasG.create_line(x1, y1, x2, y2, fill="red", width=1)
-#         matchesA.append([ix1,iy1])
-#         matchesB.append([ix2,iy2])
-#         inA = False
-#         inB = False
-
 
 def selectGlobalCanvas(event):
     if not imagesLoaded:
         return
 
     global bbox1, bbox2, canvasG
+
     x = event.x
     y = event.y
 
-    # def square_bbox(bbox):
-    #     kxa = original_image_dimA[0] / img_w
-    #     kya = original_image_dimA[1] / img_h
-    #     bbox['p1']
-    #     # To be implemented
-
-
     if x < img_w:
         if bbox1['p1'] is not None:
-            bbox1['p2'] = bbox1['p1']
+            bbox1['p2'] = bbox1['buffer']
         bbox1['p1'] = np.array((x, y))
+        bbox1['buffer'] = np.array((x, y))
 
-        bbox2['p1'] = bbox1['p1'] + [(img_w + 10), 0]
+        bbox2['p1'] = bbox1['buffer'] + [(img_w + 10), 0]
+        bbox2['buffer'] = bbox1['buffer'] + [(img_w + 10), 0]
         bbox2['p2'] = bbox1['p2'] + [(img_w + 10), 0] if bbox1['p2'] is not None else None
 
     elif x > img_w + 10:
         if bbox2['p1'] is not None:
-            bbox2['p2'] = bbox2['p1']
+            bbox2['p2'] = bbox2['buffer']
         bbox2['p1'] = np.array((x, y))
+        bbox2['buffer'] = np.array((x, y))
 
-        bbox1['p1'] = bbox2['p1'] - [(img_w + 10), 0]
+        bbox1['p1'] = bbox2['buffer'] - [(img_w + 10), 0]
+        bbox1['buffer'] = bbox2['buffer'] - [(img_w + 10), 0]
         bbox1['p2'] = bbox2['p2'] - [(img_w + 10), 0] if bbox2['p2'] is not None else None
+
+    def square_bbox(bbox):
+        # change either x or y lenght of box to be square in original image
+        kx = original_image_dimA[0] / img_w
+        ky = original_image_dimA[1] / img_h
+        p1 = bbox['p1']
+        p2 = bbox['p2']
+        if abs(p1[0]-p2[0])*kx < abs(p1[1]-p2[1])*ky:
+            p1[0] = p2[0] + (p1[1]-p2[1])*ky
+        else:
+            p1[1] = p2[1] + (p1[0]-p2[0])*kx
+        bbox['p1'] = p1
+        bbox['p2'] = p2
+        return bbox
 
     def make_box(bbox):
         if bbox['box'] is not None:
@@ -122,14 +94,18 @@ def selectGlobalCanvas(event):
         lines.append(canvasG.create_line(bbox['p2'][0], bbox['p1'][1], bbox['p2'][0], bbox['p2'][1], fill="green", width=3))
         lines.append(canvasG.create_line(bbox['p2'][0], bbox['p2'][1], bbox['p1'][0], bbox['p2'][1], fill="green", width=3))
         lines.append(canvasG.create_line(bbox['p1'][0], bbox['p2'][1], bbox['p1'][0], bbox['p1'][1], fill="green", width=3))
+        #lines.append(canvasG.create_oval(bbox['buffer']+1, bbox['buffer']-1, bbox['buffer']+1, bbox['buffer']-1,
+        #                                 fill="red", width=2))
         bbox['box'] = lines
         canvasG.update()
         return bbox
 
     if bbox1['p1'] is not None and bbox1['p2'] is not None:
+        bbox1 = square_bbox(bbox1)
         bbox1 = make_box(bbox1)
 
     if bbox2['p1'] is not None and bbox2['p2'] is not None:
+        bbox2 = square_bbox(bbox2)
         bbox2 = make_box(bbox2)
 
 
@@ -188,8 +164,8 @@ def clearSelection():
     global canvasG, img_w, img_h, imageB, imageA, matchesA, matchesB, images_root, images_id, bbox1, bbox2
 
     canvasG.delete("all")
-    bbox1 = {'p1': None, 'p2': None, 'box': None}
-    bbox2 = {'p1': None, 'p2': None, 'box': None}
+    bbox1 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
+    bbox2 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
 
     photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA))
     canvasG.create_image(0, 0, image=photo1, anchor=tk.NW, tags="imageA")
@@ -214,10 +190,6 @@ def exportMatchData():
         errorPopup("First select two images!")
         return
     
-    # if len(matchesA) < 4:
-    #     errorPopup("Not Sufficient Points selected\n Select atleast 4 correspondances!")
-    #     return
-
     # undo resize to achive positions on original images
     kxa = original_image_dimA[0]/img_w
     kya = original_image_dimA[1]/img_h

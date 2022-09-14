@@ -44,8 +44,6 @@ imageA = None
 matchesA = []
 matchesB = []
 
-bbox1 = {'p1': None, 'p2': None, 'box': None}
-bbox2 = {'p1': None, 'p2': None, 'box': None}
 
 imagesLoaded = False
 
@@ -93,56 +91,6 @@ def selectGlobalCanvas(event):
         inB = False
 
 
-def selectGlobalCanvas2(event):
-    if not imagesLoaded:
-        return
-
-    global bbox1, bbox2, canvasG
-    x = event.x
-    y = event.y
-
-    # def square_bbox(bbox):
-    #     kxa = original_image_dimA[0] / img_w
-    #     kya = original_image_dimA[1] / img_h
-    #     bbox['p1']
-    #     # To be implemented
-
-
-    if x < img_w:
-        if bboxA['p1'] is not None:
-            bboxA['p2'] = bboxA['p1']
-        bboxA['p1'] = np.array((x, y))
-
-        bboxB['p1'] = bboxA['p1'] + [(img_w + 10), 0]
-        bboxB['p2'] = bboxA['p2'] + [(img_w + 10), 0] if bboxA['p2'] is not None else None
-
-    elif x > img_w + 10:
-        if bboxB['p1'] is not None:
-            bboxB['p2'] = bboxB['p1']
-        bboxB['p1'] = np.array((x, y))
-
-        bboxA['p1'] = bboxB['p1'] - [(img_w + 10), 0]
-        bboxA['p2'] = bboxB['p2'] - [(img_w + 10), 0] if bboxB['p2'] is not None else None
-
-    def make_box(bbox):
-        if bbox['box'] is not None:
-            for line in bbox['box']:
-                canvasG.delete(line)
-
-        lines = []
-        lines.append(canvasG.create_line(bbox['p1'][0], bbox['p1'][1], bbox['p2'][0], bbox['p1'][1], fill="green", width=3))
-        lines.append(canvasG.create_line(bbox['p2'][0], bbox['p1'][1], bbox['p2'][0], bbox['p2'][1], fill="green", width=3))
-        lines.append(canvasG.create_line(bbox['p2'][0], bbox['p2'][1], bbox['p1'][0], bbox['p2'][1], fill="green", width=3))
-        lines.append(canvasG.create_line(bbox['p1'][0], bbox['p2'][1], bbox['p1'][0], bbox['p1'][1], fill="green", width=3))
-        bbox['box'] = lines
-        canvasG.update()
-        return bbox
-
-    if bboxA['p1'] is not None and bboxA['p2'] is not None:
-        bboxA = make_box(bboxA)
-
-    if bboxB['p1'] is not None and bboxB['p2'] is not None:
-        bboxB = make_box(bboxB)
 
 
 def loadImages(imgs_root_path, imgs_id):
@@ -191,8 +139,6 @@ def clearSelection():
     canvasG.delete("all")
     matchesA.clear()
     matchesB.clear()
-    bboxA = {'p1': None, 'p2': None, 'box': None}
-    bboxB = {'p1': None, 'p2': None, 'box': None}
 
     
     inA = inB = False
@@ -287,7 +233,6 @@ b1.grid(row=0, column=5)
 canvasG = tk.Canvas(window, width=2*img_w+10, height=img_h, bg="grey") 
 canvasG.place(x = 10, y=50) 
 canvasG.bind("<Button-1>", selectGlobalCanvas)
-canvasG.bind("<Button-3>", selectGlobalCanvas2)
 
 b3 = tk.Button(window, text='Undo Selection', width=30, command=clearSelection)
 b3.place(x=300, y=img_h+100)
