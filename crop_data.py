@@ -25,24 +25,10 @@ img_h = None
 original_image_dimA = None
 original_image_dimB = None
 
-x1 = 0
-y1 = 0
-x2 = 0
-y2 = 0
-
-ix1 = 0
-iy1 = 0
-ix2 = 0
-iy2 = 0
-
-inA = False
-inB = False
-
 imageB = None
 imageA = None
-
-matchesA = []
-matchesB = []
+depth_mapA = None
+depth_mapB = None
 
 bbox1 = {'p1': None, 'p2': None, 'box': None}
 bbox2 = {'p1': None, 'p2': None, 'box': None}
@@ -50,50 +36,51 @@ bbox2 = {'p1': None, 'p2': None, 'box': None}
 imagesLoaded = False
 
 images_root = None
-images_id = None
+image_idA = None
+image_idB = None
+
+# def selectGlobalCanvas(event):
+#
+#     if not imagesLoaded:
+#         return
+#
+#     global x1,y1,x2,y2, ix1, iy1, ix2, iy2, matchesA, matchesB
+#     global canvasG, drawLine, img_w, img_h, inA, inB
+#     x = event.x
+#     y = event.y
+#
+#     if x < img_w:
+#         x1 = x
+#         y1 = y
+#
+#         ix1 = x
+#         iy1 = y
+#         inA = True
+#
+#         canvasG.create_line(event.x-5, event.y, event.x+5, event.y, fill="blue", width=1)
+#         canvasG.create_line(event.x, event.y-5, event.x, event.y+5, fill="blue", width=1)
+#
+#     elif x > img_w+10:
+#         x2 = x
+#         y2 = y
+#
+#         ix2 = x-img_w-10
+#         iy2 = y
+#         inB = True
+#         canvasG.create_line(event.x+5, event.y, event.x-5, event.y, fill="yellow", width=1)
+#         canvasG.create_line(event.x, event.y+5, event.x, event.y-5, fill="yellow", width=1)
+#
+#
+#
+#     if inA == True and inB == True:
+#         canvasG.create_line(x1, y1, x2, y2, fill="red", width=1)
+#         matchesA.append([ix1,iy1])
+#         matchesB.append([ix2,iy2])
+#         inA = False
+#         inB = False
+
 
 def selectGlobalCanvas(event):
-    
-    if not imagesLoaded:
-        return
-    
-    global x1,y1,x2,y2, ix1, iy1, ix2, iy2, matchesA, matchesB
-    global canvasG, drawLine, img_w, img_h, inA, inB
-    x = event.x
-    y = event.y
-    
-    if x < img_w:
-        x1 = x
-        y1 = y
-        
-        ix1 = x
-        iy1 = y
-        inA = True
-        
-        canvasG.create_line(event.x-5, event.y, event.x+5, event.y, fill="blue", width=1)
-        canvasG.create_line(event.x, event.y-5, event.x, event.y+5, fill="blue", width=1)
-
-    elif x > img_w+10:
-        x2 = x
-        y2 = y
-        
-        ix2 = x-img_w-10
-        iy2 = y
-        inB = True
-        canvasG.create_line(event.x+5, event.y, event.x-5, event.y, fill="yellow", width=1)
-        canvasG.create_line(event.x, event.y+5, event.x, event.y-5, fill="yellow", width=1)
-
-
-
-    if inA == True and inB == True:
-        canvasG.create_line(x1, y1, x2, y2, fill="red", width=1)
-        matchesA.append([ix1,iy1])
-        matchesB.append([ix2,iy2])
-        inA = False
-        inB = False
-
-
-def selectGlobalCanvas2(event):
     if not imagesLoaded:
         return
 
@@ -109,20 +96,20 @@ def selectGlobalCanvas2(event):
 
 
     if x < img_w:
-        if bboxA['p1'] is not None:
-            bboxA['p2'] = bboxA['p1']
-        bboxA['p1'] = np.array((x, y))
+        if bbox1['p1'] is not None:
+            bbox1['p2'] = bbox1['p1']
+        bbox1['p1'] = np.array((x, y))
 
-        bboxB['p1'] = bboxA['p1'] + [(img_w + 10), 0]
-        bboxB['p2'] = bboxA['p2'] + [(img_w + 10), 0] if bboxA['p2'] is not None else None
+        bbox2['p1'] = bbox1['p1'] + [(img_w + 10), 0]
+        bbox2['p2'] = bbox1['p2'] + [(img_w + 10), 0] if bbox1['p2'] is not None else None
 
     elif x > img_w + 10:
-        if bboxB['p1'] is not None:
-            bboxB['p2'] = bboxB['p1']
-        bboxB['p1'] = np.array((x, y))
+        if bbox2['p1'] is not None:
+            bbox2['p2'] = bbox2['p1']
+        bbox2['p1'] = np.array((x, y))
 
-        bboxA['p1'] = bboxB['p1'] - [(img_w + 10), 0]
-        bboxA['p2'] = bboxB['p2'] - [(img_w + 10), 0] if bboxB['p2'] is not None else None
+        bbox1['p1'] = bbox2['p1'] - [(img_w + 10), 0]
+        bbox1['p2'] = bbox2['p2'] - [(img_w + 10), 0] if bbox2['p2'] is not None else None
 
     def make_box(bbox):
         if bbox['box'] is not None:
@@ -138,44 +125,53 @@ def selectGlobalCanvas2(event):
         canvasG.update()
         return bbox
 
-    if bboxA['p1'] is not None and bboxA['p2'] is not None:
-        bboxA = make_box(bboxA)
+    if bbox1['p1'] is not None and bbox1['p2'] is not None:
+        bbox1 = make_box(bbox1)
 
-    if bboxB['p1'] is not None and bboxB['p2'] is not None:
-        bboxB = make_box(bboxB)
+    if bbox2['p1'] is not None and bbox2['p2'] is not None:
+        bbox2 = make_box(bbox2)
 
 
-def loadImages(imgs_root_path, imgs_id):
-    global canvasG, img_w, img_h, imageB, imageA, imagesLoaded, images_root,\
-        images_id, original_image_dimA, original_image_dimB
+def loadImages(imgs_root_path, imgs_idA, imgs_idB):
+    global canvasG, img_w, img_h, imageB, imageA, depth_mapA, depth_mapB, imagesLoaded, images_root,\
+        image_idA, image_idB, original_image_dimA, original_image_dimB
 
     images_root = Path(imgs_root_path.get())
-    images_id = imgs_id.get()
-    path1 = images_root / (images_id + 'A.tiff')
-    path2 = images_root / (images_id + 'B.tiff')
+    image_idA = imgs_idA.get()
+    image_idB = imgs_idB.get()
+    path1 = images_root / (image_idA + '.tiff')
+    path2 = images_root / (image_idA + '_depth.csv')
+    path3 = images_root / (image_idB + '.tiff')
+    path4 = images_root / (image_idB + '_depth.csv')
 
-    # Load an image using OpenCV
+    # Load an image A using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
     original_image_dimA = cv_img.shape
     cv_img = cv2.resize(cv_img, (img_w, img_h))
+    # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
+    photo1 = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
     imageA = cv_img
 
+    # Load depth map from csv using numpy
+    depth_mapA = np.genfromtxt(path2)
     # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photoA = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
-    # Add a PhotoImage to the Canvas
-    canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
+    photo2 = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
 
-
-    # Load an image using OpenCV
-    cv_img = cv2.cvtColor(cv2.imread(str(path2)), cv2.COLOR_BGR2RGB)
+    # Load an image B using OpenCV
+    cv_img = cv2.cvtColor(cv2.imread(str(path3)), cv2.COLOR_BGR2RGB)
     original_image_dimB = cv_img.shape
     cv_img = cv2.resize(cv_img, (img_w, img_h))
     imageB = cv_img
 
-    # Use PIL (Pillow) to convert the NumPy ndarray to a PhotoImage
-    photoB = ImageTk.PhotoImage(image=Image.fromarray(cv_img))
+    # Load depth map from csv using numpy
+    depth_mapB = np.genfromtxt(path4)
+
     # Add a PhotoImage to the Canvas
-    canvasG.create_image(img_w+10, 0, image=photoB, anchor=tk.NW, tags="imageB")
+    canvasG.create_image(0, 0, image=photo1, anchor=tk.NW, tags="image1")
+
+    # Add a PhotoImage to the Canvas
+    canvasG.create_image(img_w+10, 0, image=photo2, anchor=tk.NW, tags="image2")
+
 
     if imagesLoaded == True:
         clearSelection()
@@ -189,14 +185,9 @@ def clearSelection():
     global inA, inB
     
     canvasG.delete("all")
-    matchesA.clear()
-    matchesB.clear()
-    bboxA = {'p1': None, 'p2': None, 'box': None}
-    bboxB = {'p1': None, 'p2': None, 'box': None}
+    bbox1 = {'p1': None, 'p2': None, 'box': None}
+    bbox2 = {'p1': None, 'p2': None, 'box': None}
 
-    
-    inA = inB = False
-    
     photoA = ImageTk.PhotoImage(image=Image.fromarray(imageA))
     canvasG.create_image(0, 0, image=photoA, anchor=tk.NW, tags="imageA")
     
@@ -215,15 +206,14 @@ def errorPopup(msg):
     popup.mainloop()
     
 def exportMatchData():
-    # global matchesA, matchesB, imageB, imageA
-    
+
     if not imagesLoaded:
         errorPopup("First select two images!")
         return
     
-    if len(matchesA) < 4:
-        errorPopup("Not Sufficient Points selected\n Select atleast 4 correspondances!")
-        return
+    # if len(matchesA) < 4:
+    #     errorPopup("Not Sufficient Points selected\n Select atleast 4 correspondances!")
+    #     return
 
     # undo resize to achive positions on original images
     kxa = original_image_dimA[0]/img_w
@@ -273,13 +263,17 @@ e1.grid(row=0, column=1)
 
 tk.Label(window, text='Image ID: ').grid(row=0, column=2)
 
-images_id = tk.StringVar()
-e2 = tk.Entry(window, textvariable=images_id, width=50)
+image_idA = tk.StringVar()
+e2 = tk.Entry(window, textvariable=image_idA, width=50)
 e2.grid(row=0, column=3)
 
-tk.Label(window, text='A.tiff bzw. B.tiff').grid(row=0, column=4)
+image_idB = tk.StringVar()
+e2 = tk.Entry(window, textvariable=image_idB, width=50)
+e2.grid(row=0, column=4)
 
-loadImages = partial(loadImages, images_root, images_id)
+tk.Label(window, text='.tiff bzw. _depth.csv').grid(row=0, column=5)
+
+loadImages = partial(loadImages, images_root, image_idA, image_idB)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
 b1.grid(row=0, column=5)
 
@@ -287,12 +281,11 @@ b1.grid(row=0, column=5)
 canvasG = tk.Canvas(window, width=2*img_w+10, height=img_h, bg="grey") 
 canvasG.place(x = 10, y=50) 
 canvasG.bind("<Button-1>", selectGlobalCanvas)
-canvasG.bind("<Button-3>", selectGlobalCanvas2)
 
 b3 = tk.Button(window, text='Undo Selection', width=30, command=clearSelection)
 b3.place(x=300, y=img_h+100)
 
-b4 = tk.Button(window, text='Save feature points', width=30, command=exportMatchData)
+b4 = tk.Button(window, text='Crop images', width=30, command=exportMatchData)
 b4.place(x=window_width - 500, y=img_h+100)
 
 
