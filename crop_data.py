@@ -14,6 +14,8 @@ from functools import partial
 from pathlib import Path
 import json
 import os.path
+import scipy.fft
+import scipy.ndimage as ndi
 
 #%%
 # Todo: Don't use global variables but encapsulate in objects
@@ -26,11 +28,16 @@ img_h = None
 
 sizing = None
 
+orig_imageA = None
+orig_imageB = None
+filtered_imageA = None
+filtered_imageB = None
 imageB = None
 imageA = None
-depth_imageA = None
 depth_mapA = None
 depth_mapB = None
+depth_imageA = None
+depth_imageB = None
 
 bbox1 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
 bbox2 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
@@ -134,7 +141,7 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
     # Load an image A using OpenCV
     orig_imageA = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
     sizing = get_sizing_parameter(orig_imageA.shape)
-    shape = (int(orig_imageA.shape[1]*sizing), int(orig_imageA.shape[0]*sizing))
+    shape = (int(orig_imageA.shape[1]*sizing), int(orig_imageA.shape[0]*sizing))  # through this rounding crop not exact
     imageA = cv2.resize(orig_imageA, shape)
     photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA))
 
@@ -148,7 +155,7 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
 
     # Load an image B using OpenCV
     orig_imageB = cv2.cvtColor(cv2.imread(str(path3)), cv2.COLOR_BGR2RGB)
-    shape = (int(orig_imageB.shape[1]*sizing), int(orig_imageB.shape[0]*sizing))
+    shape = (int(orig_imageB.shape[1]*sizing), int(orig_imageB.shape[0]*sizing))  # through this rounding crop not exact
     imageB = cv2.resize(orig_imageB, shape)
     photo3 = ImageTk.PhotoImage(image=Image.fromarray(imageB))
 
@@ -181,9 +188,12 @@ def clearSelection():
     bbox1 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
     bbox2 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
 
-    photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA))
+    shape = (int(imageA.shape[1]), int(imageA.shape[0]))
+    photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA)) if filtered_imageA is None \
+        else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageA, shape)))
     photo2 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageA))
-    photo3 = ImageTk.PhotoImage(image=Image.fromarray(imageB))
+    photo3 = ImageTk.PhotoImage(image=Image.fromarray(imageB)) if filtered_imageB is None \
+        else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageB, shape)))
     photo4 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageB))
 
     # Add a PhotoImage to the Canvas
@@ -203,10 +213,10 @@ def errorPopup(msg):
     B1.pack()
     popup.mainloop()
     
-def process_and_export_data():
+def processAndExportData():
 
-    if not imagesLoaded:
-        errorPopup("First select two images!")
+    if not imagesLoaded or (bbox2['p1'] is None):
+        errorPopup("First select two images and select cropping area!")
         return
 
     # prepare cropping
@@ -215,31 +225,75 @@ def process_and_export_data():
         if bbox1['p1'][0] < bbox1['p2'][0] else (bbox1['p2'][0], bbox1['p1'][0])
     cropbox[1], cropbox[3] = (bbox1['p1'][1], bbox1['p2'][1]) \
         if bbox1['p1'][1] < bbox1['p2'][1] else (bbox1['p2'][1], bbox1['p1'][1])
+
+    rescaled_cropbox = list(map(lambda x: int(x*(1/sizing)), cropbox))
+
     def imcrop(img, bbox):
         x1, y1, x2, y2 = bbox
         if x1 < 0 or y1 < 0 or x2 > img.shape[1] or y2 > img.shape[0]:
             errorPopup("Can't crop outside of image")
         return img[y1:y2, x1:x2]
 
+    output_images = [orig_imageA, orig_imageB] if (filtered_imageA is None or filtered_imageB is None) \
+        else [filtered_imageA, filtered_imageB]
+    output_depth_maps = [depth_mapA, depth_mapB]
 
-    for image, extention in zip([imageA, imageB], ['A', 'B']):
+    for image, extention in zip(output_images, ['A', 'B']):
         path = images_root / (images_id + extention +'.tiff')
         if path.exists():
             errorPopup('! Warning - file already exists - {} and following '
                        'won\'t be saved!'.format(str(path)))
             return
-        image_cropped = imcrop(image, cropbox)
+        image_cropped = imcrop(image, rescaled_cropbox)
         image_cropped = cv2.cvtColor(image_cropped, cv2.COLOR_RGB2BGR)
         cv2.imwrite(str(path), image_cropped)
 
-    for depth_map, extention in zip([depth_mapA, depth_mapB], ['A', 'B']):
+    for depth_map, extention in zip(output_depth_maps, ['A', 'B']):
         path = images_root / (images_id + extention + '.csv')
         if path.exists():
             errorPopup('! Warning - file already exists - {} and following '
                        'won\'t be saved!'.format(str(path)))
             return
-        depth_map_cropped = imcrop(depth_map, cropbox)
+        depth_map_cropped = imcrop(depth_map, rescaled_cropbox)
         np.savetxt(str(path), depth_map_cropped)
+
+def filterImages(filter_width):
+    global filtered_imageA, filtered_imageB
+
+    width = float(filter_width.get())
+
+    def filter_stripes(img):
+        fft_imgr = np.fft.fft2(img[:, :, 0])
+        fft_imgr = scipy.fft.fftshift(fft_imgr)
+        fft_imgg = np.fft.fft2(img[:, :, 1])
+        fft_imgg = scipy.fft.fftshift(fft_imgg)
+        fft_imgb = np.fft.fft2(img[:, :, 2])
+        fft_imgb = scipy.fft.fftshift(fft_imgb)
+
+        for k in range(img.shape[1]):
+            _k = abs(k - img.shape[1] / 2)
+            if not 5 < _k < 200:
+                pass
+            else:
+                half = int(img.shape[0] / 2)
+                value = int(width * _k)
+                for j in range(half-value, half + value):
+                    fft_imgr[j, k] = 0
+                    fft_imgg[j, k] = 0
+                    fft_imgb[j, k] = 0
+
+        orig_imgr = np.fft.ifft2(scipy.fft.fftshift(fft_imgr))
+        orig_imgg = np.fft.ifft2(scipy.fft.fftshift(fft_imgg))
+        orig_imgb = np.fft.ifft2(scipy.fft.fftshift(fft_imgb))
+
+        return np.stack((orig_imgr, orig_imgg, orig_imgb), axis=-1).real.astype(np.uint8)
+
+    filtered_imageA = filter_stripes(orig_imageA)
+    filtered_imageB = filter_stripes(orig_imageB)
+
+    clearSelection()
+
+
 # ------------------------------------------------------------------------------
 # Main
 # ------------------------------------------------------------------------------
@@ -282,15 +336,28 @@ loadImages = partial(loadImages, images_root, image_idA, image_idB)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
 b1.grid(row=0, column=6)
 
+# Filter interface
+tk.Label(window, text='Filter: width').grid(row=1, column=0)
 
+filter_width = tk.StringVar()
+filter_width.set('0')
+e2 = tk.Entry(window, textvariable=filter_width, width=50)
+e2.grid(row=1, column=1)
+
+filterImages = partial(filterImages, filter_width)
+b2 = tk.Button(window, text='Apply Filter', width=10, command=filterImages)
+b2.grid(row=1, column=2)
+
+
+# Saving and clearing
 canvasG = tk.Canvas(window, width=2*img_w+10, height=2*img_h+10, bg="grey")
-canvasG.place(x = 10, y=50) 
+canvasG.place(x = 10, y=70)
 canvasG.bind("<Button-1>", selectGlobalCanvas)
 
 b3 = tk.Button(window, text='Undo Selection', width=30, command=clearSelection)
 b3.place(x=300, y=2*img_h+80)
 
-b4 = tk.Button(window, text='Crop images', width=30, command=process_and_export_data)
+b4 = tk.Button(window, text='Crop images', width=30, command=processAndExportData)
 b4.place(x=window_width - 500, y=2*img_h+80)
 
 
