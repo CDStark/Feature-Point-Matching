@@ -122,11 +122,18 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
     global canvasG, img_w, img_h, imagesLoaded, images_root, image_idA, image_idB, images_id, sizing,\
         orig_imageA, orig_imageB, imageA, imageB, depth_mapA, depth_mapB, depth_imageA, depth_imageB
 
+    def common_image_id(id_a, id_b):
+        sb_a, date_a, id_a, nr_a = id_a.split('_')
+        sb_b, date_b, id_b, nr_b = id_b.split('_')
+        if sb_a==sb_b and date_a==date_b and id_a==id_b:
+            return sb_a+date_a+id_a
+        else:
+            return os.path.commonprefix([id_a, id_b])
 
     images_root = Path(imgs_root_path.get())
     image_idA = imgs_idA.get()
     image_idB = imgs_idB.get()
-    images_id = os.path.commonprefix([image_idA, image_idB])
+    images_id = common_image_id(image_idA, image_idB)
     path1 = images_root / (image_idA + '.tiff')
     path2 = images_root / (image_idA + '_depth.csv')
     path3 = images_root / (image_idB + '.tiff')
@@ -213,7 +220,8 @@ def errorPopup(msg):
     B1.pack()
     popup.mainloop()
     
-def processAndExportData():
+def processAndExportData(save_path):
+    save_path = save_path.get()
 
     if not imagesLoaded or (bbox2['p1'] is None):
         errorPopup("First select two images and select cropping area!")
@@ -238,8 +246,9 @@ def processAndExportData():
         else [filtered_imageA, filtered_imageB]
     output_depth_maps = [depth_mapA, depth_mapB]
 
+    save_dir = images_root / save_path
     for image, extention in zip(output_images, ['A', 'B']):
-        path = images_root / (images_id + extention +'.tiff')
+        path = save_dir / (images_id + extention +'_cropped.tiff')
         if path.exists():
             errorPopup('! Warning - file already exists - {} and following '
                        'won\'t be saved!'.format(str(path)))
@@ -249,7 +258,7 @@ def processAndExportData():
         cv2.imwrite(str(path), image_cropped)
 
     for depth_map, extention in zip(output_depth_maps, ['A', 'B']):
-        path = images_root / (images_id + extention + '.csv')
+        path = save_dir / (images_id + extention + '_cropped.csv')
         if path.exists():
             errorPopup('! Warning - file already exists - {} and following '
                        'won\'t be saved!'.format(str(path)))
@@ -257,10 +266,14 @@ def processAndExportData():
         depth_map_cropped = imcrop(depth_map, rescaled_cropbox)
         np.savetxt(str(path), depth_map_cropped)
 
-def filterImages(filter_width):
+def filterImages(filter_width, gap, length):
     global filtered_imageA, filtered_imageB
-
     width = float(filter_width.get())
+    gap = float(gap.get())
+    length = float(length.get())
+
+    if length > 100 or 0 > length or not gap/2 < length:
+        errorPopup('Check filter parameters, length too small or gap too large')
 
     def filter_stripes(img):
         fft_imgr = np.fft.fft2(img[:, :, 0])
@@ -272,7 +285,7 @@ def filterImages(filter_width):
 
         for k in range(img.shape[1]):
             _k = abs(k - img.shape[1] / 2)
-            if not 5 < _k < 200:
+            if not gap/2 < _k < (img.shape[1]/2)*length:
                 pass
             else:
                 half = int(img.shape[0] / 2)
@@ -327,8 +340,8 @@ e2 = tk.Entry(window, textvariable=image_idA, width=50)
 e2.grid(row=0, column=3)
 
 image_idB = tk.StringVar()
-e2 = tk.Entry(window, textvariable=image_idB, width=50)
-e2.grid(row=0, column=4)
+e3 = tk.Entry(window, textvariable=image_idB, width=50)
+e3.grid(row=0, column=4)
 
 tk.Label(window, text='.tiff bzw. _depth.csv').grid(row=0, column=5)
 
@@ -337,16 +350,26 @@ b1 = tk.Button(window, text='Load', width=10, command=loadImages)
 b1.grid(row=0, column=6)
 
 # Filter interface
-tk.Label(window, text='Filter: width').grid(row=1, column=0)
+tk.Label(window, text='Filter: width(slope), gap, length(%)').grid(row=1, column=0)
 
 filter_width = tk.StringVar()
 filter_width.set('0')
-e2 = tk.Entry(window, textvariable=filter_width, width=50)
-e2.grid(row=1, column=1)
+e4 = tk.Entry(window, textvariable=filter_width, width=20)
+e4.grid(row=1, column=1)
+filter_gap = tk.StringVar()
+filter_gap.set('0')
+e5 = tk.Entry(window, textvariable=filter_gap, width=20)
+e5.grid(row=1, column=2)
+filter_length = tk.StringVar()
+filter_length.set('100')
+e6 = tk.Entry(window, textvariable=filter_length, width=20)
+e6.grid(row=1, column=3)
 
-filterImages = partial(filterImages, filter_width)
+
+
+filterImages = partial(filterImages, filter_width, filter_gap, filter_length)
 b2 = tk.Button(window, text='Apply Filter', width=10, command=filterImages)
-b2.grid(row=1, column=2)
+b2.grid(row=1, column=4)
 
 
 # Saving and clearing
@@ -355,10 +378,15 @@ canvasG.place(x = 10, y=70)
 canvasG.bind("<Button-1>", selectGlobalCanvas)
 
 b3 = tk.Button(window, text='Undo Selection', width=30, command=clearSelection)
-b3.place(x=300, y=2*img_h+80)
+b3.place(x=300, y=2*img_h+100)
 
-b4 = tk.Button(window, text='Crop images', width=30, command=processAndExportData)
-b4.place(x=window_width - 500, y=2*img_h+80)
+save_path = tk.StringVar()
+save_path.set('.')
+e7 = tk.Entry(window, textvariable=filter_length, width=20)
+e7.place(x=window_width - 500, y=2*img_h+150)
+processAndExportData = partial(processAndExportData, save_path)
+b4 = tk.Button(window, text='Crop and save', width=30, command=processAndExportData)
+b4.place(x=window_width - 500, y=2*img_h+100)
 
 
 window.mainloop() 
