@@ -87,6 +87,17 @@ def selectGlobalCanvas(event):
             p1[0] = p2[0] + abs(p1[1]-p2[1])*np.sign(p1[0]-p2[0])
         else:
             p1[1] = p2[1] + abs(p1[0]-p2[0])*np.sign(p1[1]-p2[1])
+        # Make sure box is square and p1 smaller than p2
+        if not p2[0] - p1[0] > 0:
+            buffer = p1[0]
+            p1[0] = p2[0]
+            p2[0] = buffer
+        if not p2[1] - p1[1] > 0:
+            buffer = p1[1]
+            p1[1] = p2[1]
+            p2[1] = buffer
+        assert p1[0]-p2[0] == p1[1]-p2[1]
+
         bbox['p1'] = p1
         bbox['p2'] = p2
         return bbox
@@ -123,10 +134,14 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
         orig_imageA, orig_imageB, imageA, imageB, depth_mapA, depth_mapB, depth_imageA, depth_imageB
 
     def common_image_id(id_a, id_b):
-        sb_a, date_a, id_a, nr_a = id_a.split('_')
-        sb_b, date_b, id_b, nr_b = id_b.split('_')
-        if sb_a==sb_b and date_a==date_b and id_a==id_b:
-            return sb_a+date_a+id_a
+        successful = True
+        try:
+            sb_a, date_a, id_a, nr_a = id_a.split('_')
+            sb_b, date_b, id_b, nr_b = id_b.split('_')
+        except ValueError:
+            successful = False
+        if successful and sb_a==sb_b and date_a==date_b and id_a==id_b:
+            return sb_a+'_'+date_a+'_'+id_a
         else:
             return os.path.commonprefix([id_a, id_b])
 
@@ -234,7 +249,11 @@ def processAndExportData(save_path):
     cropbox[1], cropbox[3] = (bbox1['p1'][1], bbox1['p2'][1]) \
         if bbox1['p1'][1] < bbox1['p2'][1] else (bbox1['p2'][1], bbox1['p1'][1])
 
-    rescaled_cropbox = list(map(lambda x: int(x*(1/sizing)), cropbox))
+    cropbox = list(map(lambda x: int(x*(1/sizing)), cropbox))
+    if not cropbox[0]-cropbox[2] == cropbox[1]-cropbox[3]:
+        cropbox[3] = cropbox[1] + cropbox[2] - cropbox[0]  # 2 keep square after rounding errors
+    rescaled_cropbox = cropbox
+
 
     def imcrop(img, bbox):
         x1, y1, x2, y2 = bbox
@@ -258,7 +277,7 @@ def processAndExportData(save_path):
         cv2.imwrite(str(path), image_cropped)
 
     for depth_map, extention in zip(output_depth_maps, ['A', 'B']):
-        path = save_dir / (images_id + extention + '_cropped.csv')
+        path = save_dir / (images_id + extention + '_cropped_depth.csv')
         if path.exists():
             errorPopup('! Warning - file already exists - {} and following '
                        'won\'t be saved!'.format(str(path)))
@@ -329,7 +348,7 @@ window.title("Image Stitching - Kartik Saini")
 tk.Label(window, text='Root dir: ').grid(row=0)
 
 images_root = tk.StringVar()
-images_root.set('/home/cstaerk/Documents/Uni/Studienarbeit/Feature-Point-Matching/Data/')
+images_root.set('/home/cstaerk/Desktop/grk_machine/b1/cstaerk/data/depth_map')
 e1 = tk.Entry(window, textvariable=images_root, width=50)
 e1.grid(row=0, column=1)
 
@@ -382,7 +401,7 @@ b3.place(x=300, y=2*img_h+100)
 
 save_path = tk.StringVar()
 save_path.set('.')
-e7 = tk.Entry(window, textvariable=filter_length, width=20)
+e7 = tk.Entry(window, textvariable=save_path, width=20)
 e7.place(x=window_width - 500, y=2*img_h+150)
 processAndExportData = partial(processAndExportData, save_path)
 b4 = tk.Button(window, text='Crop and save', width=30, command=processAndExportData)

@@ -99,8 +99,8 @@ def loadImages(imgs_root_path, imgs_id):
 
     images_root = Path(imgs_root_path.get())
     images_id = imgs_id.get()
-    path1 = images_root / (images_id + 'A.tiff')
-    path2 = images_root / (images_id + 'B.tiff')
+    path1 = images_root / (images_id + 'A_cropped.tiff')
+    path2 = images_root / (images_id + 'B_cropped.tiff')
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
@@ -172,10 +172,10 @@ def exportMatchData():
         return
 
     # undo resize to achive positions on original images
-    kxa = original_image_dimA[0]/img_w
-    kya = original_image_dimA[1]/img_h
-    kxb = original_image_dimB[0]/img_w
-    kyb = original_image_dimB[1]/img_h
+    kxa = original_image_dimA[1]/img_w  # y is first pos, x second in shape
+    kya = original_image_dimA[0]/img_h
+    kxb = original_image_dimB[1]/img_w
+    kyb = original_image_dimB[0]/img_h
     matchesA_resized = [[x*kxa, y*kya] for x, y in matchesA]
     matchesB_resized = [[x*kxb, y*kyb] for x, y in matchesB]
 
@@ -184,7 +184,7 @@ def exportMatchData():
                  'pointsB': matchesB_resized,
                  'imagesID': images_id,
                  }
-    path = images_root / (images_id + '_match_data.json')
+    path = images_root / (images_id + 'B_cropped_match_data.json')
     if path.exists():
         errorPopup('! Warning - file already exists - won\'t be saved!')
         return
@@ -213,7 +213,7 @@ window.title("Image Stitching - Kartik Saini")
 tk.Label(window, text='Root dir: ').grid(row=0)
 
 images_root = tk.StringVar()
-images_root.set('/home/cstaerk/Documents/Uni/Studienarbeit/Feature-Point-Matching/Data/')
+images_root.set('/home/cstaerk/Desktop/grk_machine/b1/cstaerk/data/depth_map')
 e1 = tk.Entry(window, textvariable=images_root, width=50)
 e1.grid(row=0, column=1)
 
@@ -223,7 +223,7 @@ images_id = tk.StringVar()
 e2 = tk.Entry(window, textvariable=images_id, width=50)
 e2.grid(row=0, column=3)
 
-tk.Label(window, text='A.tiff bzw. B.tiff').grid(row=0, column=4)
+tk.Label(window, text='A_cropped.tiff bzw. B_cropped.tiff').grid(row=0, column=4)
 
 loadImages = partial(loadImages, images_root, images_id)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
