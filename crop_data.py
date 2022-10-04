@@ -238,20 +238,26 @@ def errorPopup(msg):
 def processAndExportData(save_path):
     save_path = save_path.get()
 
-    if not imagesLoaded or (bbox2['p1'] is None):
+    if not imagesLoaded:
         errorPopup("First select two images and select cropping area!")
         return
 
-    # prepare cropping
-    cropbox = [None, None, None, None]
-    cropbox[0], cropbox[2] = (bbox1['p1'][0], bbox1['p2'][0]) \
-        if bbox1['p1'][0] < bbox1['p2'][0] else (bbox1['p2'][0], bbox1['p1'][0])
-    cropbox[1], cropbox[3] = (bbox1['p1'][1], bbox1['p2'][1]) \
-        if bbox1['p1'][1] < bbox1['p2'][1] else (bbox1['p2'][1], bbox1['p1'][1])
+    if bbox2['p1'] is None:
+        h, w, _ = imageA.shape
+        cropbox = (0, 0, w, w) if w < h else (0, 0, h, h)
+    else:
+        bbox = bbox1
 
-    cropbox = list(map(lambda x: int(x*(1/sizing)), cropbox))
-    if not cropbox[0]-cropbox[2] == cropbox[1]-cropbox[3]:
-        cropbox[3] = cropbox[1] + cropbox[2] - cropbox[0]  # 2 keep square after rounding errors
+        # prepare cropping
+        cropbox = [None, None, None, None]
+        cropbox[0], cropbox[2] = (bbox['p1'][0], bbox['p2'][0]) \
+            if bbox['p1'][0] < bbox['p2'][0] else (bbox['p2'][0], bbox['p1'][0])
+        cropbox[1], cropbox[3] = (bbox['p1'][1], bbox['p2'][1]) \
+            if bbox['p1'][1] < bbox['p2'][1] else (bbox['p2'][1], bbox['p1'][1])
+
+        cropbox = list(map(lambda x: int(x*(1/sizing)), cropbox))
+        if not cropbox[0]-cropbox[2] == cropbox[1]-cropbox[3]:
+            cropbox[3] = cropbox[1] + cropbox[2] - cropbox[0]  # 2 keep square after rounding errors
     rescaled_cropbox = cropbox
 
 
