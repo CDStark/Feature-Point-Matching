@@ -64,10 +64,11 @@ if bool(config.getboolean('Red Line', 'active')):
         path = path.parent / (path.stem + '_WL' + path.suffix)
         img = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
     # prepare plots
-    fig, ax = plt.subplots(ncols=3, nrows=2, dpi=1000)
+    fig, ax = plt.subplots(ncols=4, nrows=2, dpi=1000)
     ax[0, 0].set_title('Original image')
     ax[0, 1].set_title('Distance image')
-    ax[0, 2].set_title('Red filtered image')
+    ax[0, 2].set_title('Brightness image')
+    ax[0, 3].set_title('Red filtered image')
 
     y, x = config.getint('Red Line', 'y'), config.getint('Red Line', 'x')
     ax[0, 0].imshow(img)
@@ -91,7 +92,6 @@ if bool(config.getboolean('Red Line', 'active')):
             # right_color = color_distance < threshold \
             #     and brightness < max_brightness
             # filtered_img[r, c] = 1 if right_color else 0
-    ax[1, 0].imshow(brightness_img)  # temp
 
     # Blurr feature images to reduce rageddness of the lines
     distance_img_blurred = ndi.gaussian_filter(distance_img, 4)
@@ -114,15 +114,20 @@ if bool(config.getboolean('Red Line', 'active')):
 
     # plot data
     ax[0, 1].imshow(distance_img)
-    ax[0, 2].imshow(filtered_img_grey)
+    ax[0, 2].imshow(brightness_img)
+    ax[0, 3].imshow(filtered_img_grey)
 
+    ax[1, 0].axis('off')
     ax[1, 1].imshow(distance_img_blurred)
-    ax[1, 2].imshow(filtered_img_grey_blurred)
+    ax[1, 2].imshow(brightness_img_blurred)
+    ax[1, 3].imshow(filtered_img_grey_blurred)
     plt.show()
 
     # save data
-    if config.getboolean('Red Line', 'smooth'):
-        np.savetxt(path.parent / (path.stem + '_sceleton.csv'), filtered_img_grey_blurred, fmt='%1i', delimiter=',')
+    if not config.getboolean('Red Line', 'smooth'):
+        np.savetxt(path.parent / (path.stem + '_sceleton.csv'), filtered_img, fmt='%1i', delimiter=',')
+    else:
+        np.savetxt(path.parent / (path.stem + '_sceleton.csv'), filtered_img_blurred, fmt='%1i', delimiter=',')
 
     # fig.savefig(path.parent / (path.stem + '_filter_plot'))
 
