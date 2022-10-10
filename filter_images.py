@@ -12,7 +12,7 @@ config.read('filter_config.ini')
 path = Path(config['Data']['dir']) / config['Data']['origin_file']
 img = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
 
-if bool(config.getboolean('Fourier','active')):
+if bool(config.getboolean('Fourier', 'active')):
     # Prepare plot
     fig, ax = plt.subplots(2, 2, dpi=1000)
     ax[0, 0].set_title('Fourier spectrum')
@@ -20,7 +20,7 @@ if bool(config.getboolean('Fourier','active')):
     ax[1, 0].set_title('Image')
     ax[1, 1].set_title('Image filtered')
 
-    #Fourier trafo
+    # Fourier trafo
     fft_imgr = np.fft.fft2(img[:, :, 0])
     fft_imgr = scipy.fft.fftshift(fft_imgr)
     fft_imgg = np.fft.fft2(img[:, :, 1])
@@ -35,7 +35,7 @@ if bool(config.getboolean('Fourier','active')):
     gap = int(config['Fourier']['gap'])
     for k in range(img.shape[1]):
         _k = abs(k - img.shape[1] / 2)
-        if not gap/2 < _k < width/2:
+        if not gap/2 < _k < (img.shape[1]/2)*width:
             pass
         else:
             half = int(img.shape[0] / 2)
@@ -51,11 +51,18 @@ if bool(config.getboolean('Fourier','active')):
     orig_imgr = np.fft.ifft2(scipy.fft.fftshift(fft_imgr))
     orig_imgg = np.fft.ifft2(scipy.fft.fftshift(fft_imgg))
     orig_imgb = np.fft.ifft2(scipy.fft.fftshift(fft_imgb))
-    ax[1, 1].imshow(np.stack((orig_imgr, orig_imgg, orig_imgb), axis=-1).real.astype(int))
+    orig_img = np.stack((orig_imgr, orig_imgg, orig_imgb), axis=-1).real.astype(np.uint8)
+    ax[1, 1].imshow(orig_img)
     plt.show()
+
+    image2save = cv2.cvtColor(orig_img, cv2.COLOR_RGB2BGR)
+    cv2.imwrite(str(path.parent / (path.stem + '_filtered.tiff')), image2save)
 
 
 if bool(config.getboolean('Red Line', 'active')):
+    if config.getboolean('Red Line', 'use_white_light'):
+        path = path.parent / (path.stem + '_WL' + path.suffix)
+        img = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
     # prepare plots
     fig, ax = plt.subplots(ncols=3, dpi=1000)
     ax[0].set_title('Original image')
@@ -85,9 +92,19 @@ if bool(config.getboolean('Red Line', 'active')):
     ax[1].imshow(distance_img)
     ax[2].imshow(filtered_img_grey)
     plt.show()
+    if config.getboolean('Red Line', 'smooth'):
+        distance_img_blurred = ndi.gaussian_filter(distance_img, 4)
+        filtered_img_grey_blurred = np.where(distance_img_blurred > threshold, 1.0, 0.0)
+        fig, ax = plt.subplots(ncols=3, dpi=1000)
+        ax[1].imshow(distance_img_blurred)
+        ax[2].imshow(np.stack((filtered_img_grey_blurred, filtered_img_grey_blurred, filtered_img_grey_blurred), axis=2))
+        plt.show()
 
     # save data
-    save_path = path.parent / (path.stem + '_sceleton.csv')
-    np.savetxt(save_path, filtered_img, fmt='%1i', delimiter=',')
-    fig.savefig(path.parent / (path.stem + '_filter_plot'))
-    # Todo: save config
+    np.savetxt(path.parent / (path.stem + '_sceleton.csv'), filtered_img, fmt='%1i', delimiter=',')
+    # fig.savefig(path.parent / (path.stem + '_filter_plot'))
+
+# save config used
+with open(path.parent / (path.stem + '_filter_config.ini'), 'w') as f:
+    config.write(f)
+
