@@ -30,8 +30,10 @@ sizing = None
 
 orig_imageA = None
 orig_imageB = None
-filtered_imageA = None
-filtered_imageB = None
+orig_imageA_WL = None
+orig_imageB_WL = None
+# filtered_imageA = None
+# filtered_imageB = None
 imageB = None
 imageA = None
 depth_mapA = None
@@ -129,9 +131,10 @@ def selectGlobalCanvas(event):
         bbox2 = make_box(bbox2)
 
 
-def loadImages(imgs_root_path, imgs_idA, imgs_idB):
+def loadImages(imgs_root_path, imgs_idA, imgs_idB, imgs_idA_WB, imgs_idB_WB):
     global canvasG, img_w, img_h, imagesLoaded, images_root, image_idA, image_idB, images_id, sizing,\
-        orig_imageA, orig_imageB, imageA, imageB, depth_mapA, depth_mapB, depth_imageA, depth_imageB
+        orig_imageA, orig_imageB, imageA, imageB, depth_mapA, depth_mapB, depth_imageA, depth_imageB,\
+        orig_imageA_WL, orig_imageB_WL
 
     def common_image_id(id_a, id_b):
         successful = True
@@ -153,6 +156,8 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
     path2 = images_root / (image_idA + '_depth.csv')
     path3 = images_root / (image_idB + '.tiff')
     path4 = images_root / (image_idB + '_depth.csv')
+    path5 = images_root / (imgs_idA_WB.get() + '.tiff') if not imgs_idA_WB.get() == '' else None
+    path6 = images_root / (imgs_idB_WB.get() + '.tiff') if not imgs_idB_WB.get() == '' else None
 
     def get_sizing_parameter(image_shape):
         if img_w/image_shape[1] < img_h/image_shape[0]:
@@ -189,6 +194,10 @@ def loadImages(imgs_root_path, imgs_idA, imgs_idB):
     depth_imageB = (depth_imageB - min_val)/(max_val-min_val)*128
     photo4 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageB))
 
+    # Load white light images A and B using OpenCV
+    orig_imageA_WL = cv2.cvtColor(cv2.imread(str(path5)), cv2.COLOR_BGR2RGB) if path5 is not None else None
+    orig_imageB_WL = cv2.cvtColor(cv2.imread(str(path6)), cv2.COLOR_BGR2RGB) if path6 is not None else None
+
     # Add a PhotoImage to the Canvas
     canvasG.create_image(0, 0, image=photo2, anchor=tk.NW, tags="image2")
     canvasG.create_image(img_w+10, 0, image=photo4, anchor=tk.NW, tags="image4")
@@ -211,11 +220,9 @@ def clearSelection():
     bbox2 = {'p1': None, 'p2': None, 'box': None, 'buffer': None}
 
     shape = (int(imageA.shape[1]), int(imageA.shape[0]))
-    photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA)) if filtered_imageA is None \
-        else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageA, shape)))
+    photo1 = ImageTk.PhotoImage(image=Image.fromarray(imageA))  # if filtered_imageA is None else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageA, shape)))
     photo2 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageA))
-    photo3 = ImageTk.PhotoImage(image=Image.fromarray(imageB)) if filtered_imageB is None \
-        else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageB, shape)))
+    photo3 = ImageTk.PhotoImage(image=Image.fromarray(imageB))  # if filtered_imageB is None else ImageTk.PhotoImage(image=Image.fromarray(cv2.resize(filtered_imageB, shape)))
     photo4 = ImageTk.PhotoImage(image=Image.fromarray(depth_imageB))
 
     # Add a PhotoImage to the Canvas
@@ -267,11 +274,22 @@ def processAndExportData(save_path):
             errorPopup("Can't crop outside of image")
         return img[y1:y2, x1:x2]
 
-    output_images = [orig_imageA, orig_imageB] if (filtered_imageA is None or filtered_imageB is None) \
-        else [filtered_imageA, filtered_imageB]
+    output_images = [orig_imageA, orig_imageB, orig_imageA_WL, orig_imageB_WL] # if (filtered_imageA is None or filtered_imageB is None) else [filtered_imageA, filtered_imageB]
+    output_wl_images = [orig_imageA_WL, orig_imageB_WL] \
+        if orig_imageA_WL is not None and orig_imageB_WL is not None else []
     output_depth_maps = [depth_mapA, depth_mapB]
 
     save_dir = images_root / save_path
+    for image, extention in zip(output_wl_images, ['A', 'B']):
+        path = save_dir / (images_id + extention +'_cropped_WL.tiff')
+        if path.exists():
+            errorPopup('! Warning - file already exists - {} and following '
+                       'won\'t be saved!'.format(str(path)))
+            return
+        image_cropped = imcrop(image, rescaled_cropbox)
+        image_cropped = cv2.cvtColor(image_cropped, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(str(path), image_cropped)
+
     for image, extention in zip(output_images, ['A', 'B']):
         path = save_dir / (images_id + extention +'_cropped.tiff')
         if path.exists():
@@ -291,46 +309,45 @@ def processAndExportData(save_path):
         depth_map_cropped = imcrop(depth_map, rescaled_cropbox)
         np.savetxt(str(path), depth_map_cropped)
 
-def filterImages(filter_width, gap, length):
-    global filtered_imageA, filtered_imageB
-    width = float(filter_width.get())
-    gap = float(gap.get())
-    length = float(length.get())
-
-    if length > 100 or 0 > length or not gap/2 < length:
-        errorPopup('Check filter parameters, length too small or gap too large')
-
-    def filter_stripes(img):
-        fft_imgr = np.fft.fft2(img[:, :, 0])
-        fft_imgr = scipy.fft.fftshift(fft_imgr)
-        fft_imgg = np.fft.fft2(img[:, :, 1])
-        fft_imgg = scipy.fft.fftshift(fft_imgg)
-        fft_imgb = np.fft.fft2(img[:, :, 2])
-        fft_imgb = scipy.fft.fftshift(fft_imgb)
-
-        for k in range(img.shape[1]):
-            _k = abs(k - img.shape[1] / 2)
-            if not gap/2 < _k < (img.shape[1]/2)*length:
-                pass
-            else:
-                half = int(img.shape[0] / 2)
-                value = int(width * _k)
-                for j in range(half-value, half + value):
-                    fft_imgr[j, k] = 0
-                    fft_imgg[j, k] = 0
-                    fft_imgb[j, k] = 0
-
-        orig_imgr = np.fft.ifft2(scipy.fft.fftshift(fft_imgr))
-        orig_imgg = np.fft.ifft2(scipy.fft.fftshift(fft_imgg))
-        orig_imgb = np.fft.ifft2(scipy.fft.fftshift(fft_imgb))
-
-        return np.stack((orig_imgr, orig_imgg, orig_imgb), axis=-1).real.astype(np.uint8)
-
-    filtered_imageA = filter_stripes(orig_imageA)
-    filtered_imageB = filter_stripes(orig_imageB)
-
+# def filterImages(filter_width, gap, length):
+#     global filtered_imageA, filtered_imageB
+#     width = float(filter_width.get())
+#     gap = float(gap.get())
+#     length = float(length.get())
+#
+#     if length > 100 or 0 > length or not gap/2 < length:
+#         errorPopup('Check filter parameters, length too small or gap too large')
+#
+#     def filter_stripes(img):
+#         fft_imgr = np.fft.fft2(img[:, :, 0])
+#         fft_imgr = scipy.fft.fftshift(fft_imgr)
+#         fft_imgg = np.fft.fft2(img[:, :, 1])
+#         fft_imgg = scipy.fft.fftshift(fft_imgg)
+#         fft_imgb = np.fft.fft2(img[:, :, 2])
+#         fft_imgb = scipy.fft.fftshift(fft_imgb)
+#
+#         for k in range(img.shape[1]):
+#             _k = abs(k - img.shape[1] / 2)
+#             if not gap/2 < _k < (img.shape[1]/2)*length:
+#                 pass
+#             else:
+#                 half = int(img.shape[0] / 2)
+#                 value = int(width * _k)
+#                 for j in range(half-value, half + value):
+#                     fft_imgr[j, k] = 0
+#                     fft_imgg[j, k] = 0
+#                     fft_imgb[j, k] = 0
+#
+#         orig_imgr = np.fft.ifft2(scipy.fft.fftshift(fft_imgr))
+#         orig_imgg = np.fft.ifft2(scipy.fft.fftshift(fft_imgg))
+#         orig_imgb = np.fft.ifft2(scipy.fft.fftshift(fft_imgb))
+#
+#         return np.stack((orig_imgr, orig_imgg, orig_imgb), axis=-1).real.astype(np.uint8)
+#
+#     filtered_imageA = filter_stripes(orig_imageA)
+#     filtered_imageB = filter_stripes(orig_imageB)
+#
     clearSelection()
-
 
 # ------------------------------------------------------------------------------
 # Main
@@ -368,33 +385,40 @@ image_idB = tk.StringVar()
 e3 = tk.Entry(window, textvariable=image_idB, width=50)
 e3.grid(row=0, column=4)
 
+image_idA_WB = tk.StringVar()
+e2 = tk.Entry(window, textvariable=image_idA_WB, width=50)
+e2.grid(row=1, column=3)
+
+image_idB_WB = tk.StringVar()
+e3 = tk.Entry(window, textvariable=image_idB_WB, width=50)
+e3.grid(row=1, column=4)
+
 tk.Label(window, text='.tiff bzw. _depth.csv').grid(row=0, column=5)
 
-loadImages = partial(loadImages, images_root, image_idA, image_idB)
+loadImages = partial(loadImages, images_root, image_idA, image_idB,
+                     image_idA_WB, image_idB_WB)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
 b1.grid(row=0, column=6)
 
-# Filter interface
-tk.Label(window, text='Filter: width(slope), gap, length(%)').grid(row=1, column=0)
-
-filter_width = tk.StringVar()
-filter_width.set('0')
-e4 = tk.Entry(window, textvariable=filter_width, width=20)
-e4.grid(row=1, column=1)
-filter_gap = tk.StringVar()
-filter_gap.set('0')
-e5 = tk.Entry(window, textvariable=filter_gap, width=20)
-e5.grid(row=1, column=2)
-filter_length = tk.StringVar()
-filter_length.set('100')
-e6 = tk.Entry(window, textvariable=filter_length, width=20)
-e6.grid(row=1, column=3)
-
-
-
-filterImages = partial(filterImages, filter_width, filter_gap, filter_length)
-b2 = tk.Button(window, text='Apply Filter', width=10, command=filterImages)
-b2.grid(row=1, column=4)
+# # Filter interface
+# tk.Label(window, text='Filter: width(slope), gap, length(%)').grid(row=1, column=0)
+#
+# filter_width = tk.StringVar()
+# filter_width.set('0')
+# e4 = tk.Entry(window, textvariable=filter_width, width=20)
+# e4.grid(row=1, column=1)
+# filter_gap = tk.StringVar()
+# filter_gap.set('0')
+# e5 = tk.Entry(window, textvariable=filter_gap, width=20)
+# e5.grid(row=1, column=2)
+# filter_length = tk.StringVar()
+# filter_length.set('100')
+# e6 = tk.Entry(window, textvariable=filter_length, width=20)
+# e6.grid(row=1, column=3)
+#
+# filterImages = partial(filterImages, filter_width, filter_gap, filter_length)
+# b2 = tk.Button(window, text='Apply Filter', width=10, command=filterImages)
+# b2.grid(row=1, column=4)
 
 
 # Saving and clearing

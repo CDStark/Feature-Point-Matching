@@ -99,8 +99,8 @@ def loadImages(imgs_root_path, imgs_id):
 
     images_root = Path(imgs_root_path.get())
     images_id = imgs_id.get()
-    path1 = images_root / (images_id + 'A_cropped.tiff')
-    path2 = images_root / (images_id + 'B_cropped.tiff')
+    path1 = images_root / (images_id + 'A.tiff')
+    path2 = images_root / (images_id + 'B.tiff')
 
     # Load an image using OpenCV
     cv_img = cv2.cvtColor(cv2.imread(str(path1)), cv2.COLOR_BGR2RGB)
@@ -223,7 +223,7 @@ images_id = tk.StringVar()
 e2 = tk.Entry(window, textvariable=images_id, width=50)
 e2.grid(row=0, column=3)
 
-tk.Label(window, text='A_cropped.tiff bzw. B_cropped.tiff').grid(row=0, column=4)
+tk.Label(window, text='A.tiff bzw. B.tiff').grid(row=0, column=4)
 
 loadImages = partial(loadImages, images_root, images_id)
 b1 = tk.Button(window, text='Load', width=10, command=loadImages)
